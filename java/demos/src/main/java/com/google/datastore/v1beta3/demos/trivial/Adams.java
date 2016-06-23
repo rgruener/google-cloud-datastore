@@ -18,7 +18,6 @@ package com.google.datastore.v1beta3.demos.trivial;
 import com.google.datastore.v1beta3.BeginTransactionRequest;
 import com.google.datastore.v1beta3.BeginTransactionResponse;
 import com.google.datastore.v1beta3.CommitRequest;
-import com.google.datastore.v1beta3.CommitResponse;
 import com.google.datastore.v1beta3.Entity;
 import com.google.datastore.v1beta3.Key;
 import com.google.datastore.v1beta3.LookupRequest;

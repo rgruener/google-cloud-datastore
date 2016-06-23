@@ -22,6 +22,12 @@ import com.google.api.client.http.HttpRequestInitializer;
 import com.google.api.client.http.HttpResponse;
 import com.google.api.client.http.protobuf.ProtoHttpContent;
 import com.google.api.client.util.IOUtils;
+import com.google.common.util.concurrent.AsyncFunction;
+import com.google.common.util.concurrent.FutureCallback;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.JdkFutureAdapters;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.SettableFuture;
 import com.google.protobuf.MessageLite;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
@@ -30,6 +36,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
 
@@ -46,11 +54,13 @@ class RemoteRpc {
   private final HttpRequestInitializer initializer;
   private final String url;
   private final AtomicInteger rpcCount = new AtomicInteger(0);
+  private final ExecutorService executorService;
 
   RemoteRpc(HttpRequestFactory client, HttpRequestInitializer initializer, String url) {
     this.client = client;
     this.initializer = initializer;
     this.url = url;
+    this.executorService = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     try {
       resolveURL("dummyRpc");
     } catch (Exception e) {
@@ -97,6 +107,65 @@ class RemoteRpc {
     } finally {
       long elapsedTime = System.currentTimeMillis() - startTime;
       logger.fine("remote datastore call " + methodName + " took " + elapsedTime + " ms");
+    }
+  }
+
+  /**
+   * Makes an async RPC call using the client. Logs how long it took and any exceptions.
+   *
+   * NOTE: The request could be an InputStream too, but the http client will need to
+   * find its length, which will require buffering it anyways.
+   *
+   */
+  public ListenableFuture<InputStream> callAsync(String methodName, MessageLite request) {
+    logger.fine("remote datastore call " + methodName);
+
+    long startTime = System.currentTimeMillis();
+    ListenableFuture<HttpResponse> httpResponseFuture;
+    try {
+      rpcCount.incrementAndGet();
+      ProtoHttpContent payload = new ProtoHttpContent(request);
+      HttpRequest httpRequest = client.buildPostRequest(resolveURL(methodName), payload);
+      httpRequest.getHeaders().put(API_FORMAT_VERSION_HEADER, API_FORMAT_VERSION);
+      // Don't throw an HTTPResponseException on error. It converts the response to a String and
+      // throws away the original, whereas we need the raw bytes to parse it as a proto.
+      httpRequest.setThrowExceptionOnExecuteError(false);
+      if (initializer != null) {
+        initializer.initialize(httpRequest);
+      }
+      httpResponseFuture = JdkFutureAdapters.listenInPoolThread(httpRequest.executeAsync(), executorService);
+      final SettableFuture<HttpResponse> httpResponseFutureFallback = SettableFuture.create();
+      Futures.addCallback(httpResponseFuture, new FutureCallback<HttpResponse>() {
+        @Override
+        public void onSuccess(HttpResponse result) {
+          httpResponseFutureFallback.set(result);
+        }
+
+        @Override
+        public void onFailure(Throwable t) {
+          httpResponseFutureFallback.setException(makeException(url, methodName, Code.UNAVAILABLE, "I/O error", t));
+        }
+      });
+      return Futures.transform(httpResponseFutureFallback, new AsyncFunction<HttpResponse, InputStream>() {
+        @Override
+        public ListenableFuture<InputStream> apply(HttpResponse httpResponse) throws Exception {
+          try {
+            if (!httpResponse.isSuccessStatusCode()) {
+              return Futures.immediateFailedFuture(makeException(url, methodName, httpResponse.getContent(),
+                      httpResponse.getContentType(), httpResponse.getContentCharset(), null,
+                      httpResponse.getStatusCode()));
+            }
+            return Futures.immediateFuture(httpResponse.getContent());
+          } catch (IOException e) {
+            return Futures.immediateFailedFuture(makeException(url, methodName, Code.UNAVAILABLE, "I/O error", e));
+          } finally {
+            long elapsedTime = System.currentTimeMillis() - startTime;
+            logger.fine("remote datastore call " + methodName + " took " + elapsedTime + " ms");
+          }
+        }
+      });
+    } catch (IOException e) {
+      return Futures.immediateFailedFuture(makeException(url, methodName, Code.UNAVAILABLE, "I/O error", e));
     }
   }
 

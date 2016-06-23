@@ -15,6 +15,9 @@
  */
 package com.google.datastore.v1beta3.client;
 
+import com.google.common.util.concurrent.AsyncFunction;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.datastore.v1beta3.AllocateIdsRequest;
 import com.google.datastore.v1beta3.AllocateIdsResponse;
 import com.google.datastore.v1beta3.BeginTransactionRequest;
@@ -71,6 +74,23 @@ public class Datastore {
     }
   }
 
+
+  public ListenableFuture<AllocateIdsResponse> allocateIdsAsync(AllocateIdsRequest request) {
+    final ListenableFuture<InputStream> future = remoteRpc.callAsync("allocateIdsAsync", request);
+    return Futures.transform(future, new AsyncFunction<InputStream, AllocateIdsResponse>() {
+      @Override
+      public ListenableFuture<AllocateIdsResponse> apply(InputStream input) throws Exception {
+        try {
+          return Futures.immediateFuture(AllocateIdsResponse.parseFrom(input));
+        } catch (IOException e) {
+          return Futures.immediateFailedFuture(invalidResponseException("allocateIdsAsync", e));
+        } finally {
+          input.close();
+        }
+      }
+    });
+  }
+
   public BeginTransactionResponse beginTransaction(BeginTransactionRequest request)
       throws DatastoreException {
     try (InputStream is = remoteRpc.call("beginTransaction", request)) {
@@ -78,6 +98,22 @@ public class Datastore {
     } catch (IOException exception) {
       throw invalidResponseException("beginTransaction", exception);
     }
+  }
+
+  public ListenableFuture<BeginTransactionResponse> beginTransactionAsync(BeginTransactionRequest request) {
+    final ListenableFuture<InputStream> future = remoteRpc.callAsync("beginTransactionAsync", request);
+    return Futures.transform(future, new AsyncFunction<InputStream, BeginTransactionResponse>() {
+      @Override
+      public ListenableFuture<BeginTransactionResponse> apply(InputStream input) throws Exception {
+        try {
+          return Futures.immediateFuture(BeginTransactionResponse.parseFrom(input));
+        } catch (IOException e) {
+          return Futures.immediateFailedFuture(invalidResponseException("beginTransactionAsync", e));
+        } finally {
+          input.close();
+        }
+      }
+    });
   }
 
   public CommitResponse commit(CommitRequest request) throws DatastoreException {
@@ -88,12 +124,44 @@ public class Datastore {
     }
   }
 
+  public ListenableFuture<CommitResponse> commitAsync(CommitRequest request) {
+    final ListenableFuture<InputStream> future = remoteRpc.callAsync("commitAsync", request);
+    return Futures.transform(future, new AsyncFunction<InputStream, CommitResponse>() {
+      @Override
+      public ListenableFuture<CommitResponse> apply(InputStream input) throws Exception {
+        try {
+          return Futures.immediateFuture(CommitResponse.parseFrom(input));
+        } catch (IOException e) {
+          return Futures.immediateFailedFuture(invalidResponseException("commitAsync", e));
+        } finally {
+          input.close();
+        }
+      }
+    });
+  }
+
   public LookupResponse lookup(LookupRequest request) throws DatastoreException {
     try (InputStream is = remoteRpc.call("lookup", request)) {
       return LookupResponse.parseFrom(is);
     } catch (IOException exception) {
       throw invalidResponseException("lookup", exception);
     }
+  }
+
+  public ListenableFuture<LookupResponse> lookupAsync(LookupRequest request) {
+    final ListenableFuture<InputStream> future = remoteRpc.callAsync("lookupAsync", request);
+    return Futures.transform(future, new AsyncFunction<InputStream, LookupResponse>() {
+      @Override
+      public ListenableFuture<LookupResponse> apply(InputStream input) throws Exception {
+        try {
+          return Futures.immediateFuture(LookupResponse.parseFrom(input));
+        } catch (IOException e) {
+          return Futures.immediateFailedFuture(invalidResponseException("lookupAsync", e));
+        } finally {
+          input.close();
+        }
+      }
+    });
   }
 
   public RollbackResponse rollback(RollbackRequest request) throws DatastoreException {
@@ -104,11 +172,43 @@ public class Datastore {
     }
   }
 
+  public ListenableFuture<RollbackResponse> rollbackAsync(RollbackRequest request) {
+    final ListenableFuture<InputStream> future = remoteRpc.callAsync("rollbackAsync", request);
+    return Futures.transform(future, new AsyncFunction<InputStream, RollbackResponse>() {
+      @Override
+      public ListenableFuture<RollbackResponse> apply(InputStream input) throws Exception {
+        try {
+          return Futures.immediateFuture(RollbackResponse.parseFrom(input));
+        } catch (IOException e) {
+          return Futures.immediateFailedFuture(invalidResponseException("rollbackAsync", e));
+        } finally {
+          input.close();
+        }
+      }
+    });
+  }
+
   public RunQueryResponse runQuery(RunQueryRequest request) throws DatastoreException {
     try (InputStream is = remoteRpc.call("runQuery", request)) {
       return RunQueryResponse.parseFrom(is);
     } catch (IOException exception) {
       throw invalidResponseException("runQuery", exception);
     }
+  }
+
+  public ListenableFuture<RunQueryResponse> runQueryAsync(RunQueryRequest request) {
+    final ListenableFuture<InputStream> future = remoteRpc.callAsync("runQueryAsync", request);
+    return Futures.transform(future, new AsyncFunction<InputStream, RunQueryResponse>() {
+      @Override
+      public ListenableFuture<RunQueryResponse> apply(InputStream input) throws Exception {
+        try {
+          return Futures.immediateFuture(RunQueryResponse.parseFrom(input));
+        } catch (IOException e) {
+          return Futures.immediateFailedFuture(invalidResponseException("runQueryAsync", e));
+        } finally {
+          input.close();
+        }
+      }
+    });
   }
 }

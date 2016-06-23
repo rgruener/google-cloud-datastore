@@ -15,13 +15,6 @@
  */
 package com.google.datastore.v1beta3.client;
 
-import static com.google.common.truth.Truth.assertThat;
-import static org.junit.Assert.assertArrayEquals;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.fail;
-
 import com.google.api.client.auth.oauth2.Credential;
 import com.google.api.client.http.GenericUrl;
 import com.google.api.client.http.HttpRequest;
@@ -36,6 +29,7 @@ import com.google.api.client.testing.http.MockLowLevelHttpRequest;
 import com.google.api.client.testing.http.MockLowLevelHttpResponse;
 import com.google.api.client.testing.util.TestableByteArrayInputStream;
 import com.google.common.collect.Iterables;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.datastore.v1beta3.AllocateIdsRequest;
 import com.google.datastore.v1beta3.AllocateIdsResponse;
 import com.google.datastore.v1beta3.BeginTransactionRequest;
@@ -54,7 +48,6 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Message;
 import com.google.rpc.Code;
 import com.google.rpc.Status;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -66,6 +59,14 @@ import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+
+import static com.google.common.truth.Truth.assertThat;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.fail;
 
 /**
  * Tests for {@link DatastoreFactory} and {@link Datastore}.
@@ -202,14 +203,28 @@ public class DatastoreTest {
   public void allocateIds() throws Exception {
     AllocateIdsRequest.Builder request = AllocateIdsRequest.newBuilder();
     AllocateIdsResponse.Builder response = AllocateIdsResponse.newBuilder();
-    expectRpc("allocateIds", request.build(), response.build());
+    expectRpc("allocateIds", request.build(), response.build(), false);
+  }
+
+  @Test
+  public void allocateIdsAsync() throws Exception {
+    AllocateIdsRequest.Builder request = AllocateIdsRequest.newBuilder();
+    AllocateIdsResponse.Builder response = AllocateIdsResponse.newBuilder();
+    expectRpc("allocateIdsAsync", request.build(), response.build(), true);
   }
 
   @Test
   public void lookup() throws Exception {
     LookupRequest.Builder request = LookupRequest.newBuilder();
     LookupResponse.Builder response = LookupResponse.newBuilder();
-    expectRpc("lookup", request.build(), response.build());
+    expectRpc("lookup", request.build(), response.build(), false);
+  }
+
+  @Test
+  public void lookupAsync() throws Exception {
+    LookupRequest.Builder request = LookupRequest.newBuilder();
+    LookupResponse.Builder response = LookupResponse.newBuilder();
+    expectRpc("lookupAsync", request.build(), response.build(), true);
   }
 
   @Test
@@ -217,7 +232,15 @@ public class DatastoreTest {
     BeginTransactionRequest.Builder request = BeginTransactionRequest.newBuilder();
     BeginTransactionResponse.Builder response = BeginTransactionResponse.newBuilder();
     response.setTransaction(ByteString.copyFromUtf8("project-id"));
-    expectRpc("beginTransaction", request.build(), response.build());
+    expectRpc("beginTransaction", request.build(), response.build(), false);
+  }
+
+  @Test
+  public void beginTransactionAsync() throws Exception {
+    BeginTransactionRequest.Builder request = BeginTransactionRequest.newBuilder();
+    BeginTransactionResponse.Builder response = BeginTransactionResponse.newBuilder();
+    response.setTransaction(ByteString.copyFromUtf8("project-id"));
+    expectRpc("beginTransactionAsync", request.build(), response.build(), true);
   }
 
   @Test
@@ -225,7 +248,15 @@ public class DatastoreTest {
     CommitRequest.Builder request = CommitRequest.newBuilder();
     request.setTransaction(ByteString.copyFromUtf8("project-id"));
     CommitResponse.Builder response = CommitResponse.newBuilder();
-    expectRpc("commit", request.build(), response.build());
+    expectRpc("commit", request.build(), response.build(), false);
+  }
+
+  @Test
+  public void commitAsync() throws Exception {
+    CommitRequest.Builder request = CommitRequest.newBuilder();
+    request.setTransaction(ByteString.copyFromUtf8("project-id"));
+    CommitResponse.Builder response = CommitResponse.newBuilder();
+    expectRpc("commitAsync", request.build(), response.build(), true);
   }
 
   @Test
@@ -233,7 +264,15 @@ public class DatastoreTest {
     RollbackRequest.Builder request = RollbackRequest.newBuilder();
     request.setTransaction(ByteString.copyFromUtf8("project-id"));
     RollbackResponse.Builder response = RollbackResponse.newBuilder();
-    expectRpc("rollback", request.build(), response.build());
+    expectRpc("rollback", request.build(), response.build(), false);
+  }
+
+  @Test
+  public void rollbackAsync() throws Exception {
+    RollbackRequest.Builder request = RollbackRequest.newBuilder();
+    request.setTransaction(ByteString.copyFromUtf8("project-id"));
+    RollbackResponse.Builder response = RollbackResponse.newBuilder();
+    expectRpc("rollbackAsync", request.build(), response.build(), true);
   }
 
   @Test
@@ -244,10 +283,21 @@ public class DatastoreTest {
     response.getBatchBuilder()
         .setEntityResultType(EntityResult.ResultType.FULL)
         .setMoreResults(QueryResultBatch.MoreResultsType.NOT_FINISHED);
-    expectRpc("runQuery", request.build(), response.build());
+    expectRpc("runQuery", request.build(), response.build(), false);
   }
 
-  private void expectRpc(String methodName, Message request, Message response) throws Exception {
+  @Test
+  public void runQueryAsync() throws Exception {
+    RunQueryRequest.Builder request = RunQueryRequest.newBuilder();
+    request.getQueryBuilder();
+    RunQueryResponse.Builder response = RunQueryResponse.newBuilder();
+    response.getBatchBuilder()
+            .setEntityResultType(EntityResult.ResultType.FULL)
+            .setMoreResults(QueryResultBatch.MoreResultsType.NOT_FINISHED);
+    expectRpc("runQueryAsync", request.build(), response.build(), true);
+  }
+
+  private void expectRpc(String methodName, Message request, Message response, boolean async) throws Exception {
     Datastore datastore = factory.create(options.build());
     MockDatastoreFactory mockClient = (MockDatastoreFactory) factory;
 
@@ -256,7 +306,11 @@ public class DatastoreTest {
     Class[] methodArgs = { request.getClass() };
     Method call = Datastore.class.getMethod(methodName, methodArgs);
     Object[] callArgs = { request };
-    assertEquals(response, call.invoke(datastore, callArgs));
+    Object invoke = call.invoke(datastore, callArgs);
+    if (async) {
+      invoke = ((ListenableFuture<Object>) invoke).get();
+    }
+    assertEquals(response, invoke);
 
     assertEquals("/v1beta3/projects/project-id:" + methodName, mockClient.lastPath);
     assertEquals("application/x-protobuf", mockClient.lastMimeType);
@@ -269,9 +323,13 @@ public class DatastoreTest {
 
     mockClient.setNextError(400, Code.INVALID_ARGUMENT, "oops");
     try {
-      call.invoke(datastore, callArgs);
+      invoke = call.invoke(datastore, callArgs);
+      if (async) {
+        // If async call need to call get to trigger exception
+        ((ListenableFuture<Object>) invoke).get();
+      }
       fail();
-    } catch (InvocationTargetException targetException) {
+    } catch (InvocationTargetException|ExecutionException targetException) {
       DatastoreException exception = (DatastoreException) targetException.getCause();
       assertEquals(Code.INVALID_ARGUMENT, exception.getCode());
       assertEquals(methodName, exception.getMethodName());
@@ -281,9 +339,13 @@ public class DatastoreTest {
     IOException ioException = new IOException("non");
     mockClient.setNextException(ioException);
     try {
-      call.invoke(datastore, callArgs);
+      invoke = call.invoke(datastore, callArgs);
+      if (async) {
+        // If async call need to call get to trigger exception
+        ((ListenableFuture<Object>) invoke).get();
+      }
       fail();
-    } catch (InvocationTargetException targetException) {
+    } catch (InvocationTargetException|ExecutionException targetException) {
       DatastoreException exception = (DatastoreException) targetException.getCause();
       assertEquals(Code.UNAVAILABLE, exception.getCode());
       assertEquals(methodName, exception.getMethodName());
